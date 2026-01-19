@@ -243,23 +243,11 @@ def generate_presigned_url(object_key: str, expires_in: int = 3600) -> str:
 
 def upload_to_storage(file_path: str, job_id: str) -> str:
     """
-    上传结果文件到云存储
-    小文件返回 base64，大文件上传到 R2 并返回预签名 URL
+    上传结果文件到 R2 并返回预签名 URL
     """
-    import base64
-
     file_size = os.path.getsize(file_path)
     ext = os.path.splitext(file_path)[1].lower()
 
-    # 小于 10MB 的文件返回 base64
-    if file_size < 10 * 1024 * 1024:
-        print(f"File size {file_size} bytes, returning as base64")
-        with open(file_path, 'rb') as f:
-            encoded = base64.b64encode(f.read()).decode('utf-8')
-        mime_type = 'video/mp4' if ext == '.mp4' else 'application/octet-stream'
-        return f"data:{mime_type};base64,{encoded}"
-
-    # 大文件上传到 R2
     print(f"File size {file_size} bytes, uploading to R2")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     object_key = f"facefusion/output/{job_id}_{timestamp}{ext}"
