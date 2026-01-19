@@ -1,15 +1,15 @@
 # FaceFusion RunPod Serverless Dockerfile
-# 基于 NVIDIA CUDA 镜像
+# Based on NVIDIA CUDA image with Ubuntu 24.04
 
-FROM nvidia/cuda:12.1-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# 安装系统依赖
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    python3.12 \
-    python3.12-venv \
+    python3 \
+    python3-venv \
     python3-pip \
     git \
     curl \
@@ -18,23 +18,22 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# 设置 Python
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 \
-    && update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
+# Setup Python (Ubuntu 24.04 has Python 3.12 by default)
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 
-# 克隆 FaceFusion
+# Clone FaceFusion
 WORKDIR /
 RUN git clone https://github.com/facefusion/facefusion.git
 
 WORKDIR /facefusion
 
-# 安装 Python 依赖
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-RUN pip install onnxruntime-gpu==1.23.2
+# Install Python dependencies (--break-system-packages for PEP 668)
+RUN pip install --upgrade pip --break-system-packages
+RUN pip install -r requirements.txt --break-system-packages
+RUN pip install onnxruntime-gpu --break-system-packages
 
-# 安装 NVIDIA CUDA 运行时库
-RUN pip install \
+# Install NVIDIA CUDA runtime libraries
+RUN pip install --break-system-packages \
     nvidia-cublas-cu12 \
     nvidia-cudnn-cu12 \
     nvidia-cufft-cu12 \
@@ -45,27 +44,27 @@ RUN pip install \
     nvidia-cuda-nvrtc-cu12 \
     nvidia-nvjitlink-cu12
 
-# 安装 RunPod SDK
-RUN pip install runpod requests
+# Install RunPod SDK
+RUN pip install runpod requests --break-system-packages
 
-# 应用 NSFW patch (禁用内容检查)
+# Apply NSFW patch (disable content check)
 COPY patches/disable-nsfw-check.py /tmp/disable-nsfw-check.py
 RUN python /tmp/disable-nsfw-check.py /facefusion
 
-# 复制模型下载脚本并预下载模型
+# Copy model download script and pre-download models
 COPY download_models.py /tmp/download_models.py
 RUN python /tmp/download_models.py standard
 
-# 创建临时目录
+# Create temp directory
 RUN mkdir -p /tmp/facefusion_jobs
 
-# 设置 CUDA 库路径
+# Set CUDA library path
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/dist-packages/nvidia/cublas/lib:/usr/local/lib/python3.12/dist-packages/nvidia/cudnn/lib:/usr/local/lib/python3.12/dist-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 
-# 复制配置文件和 handler
+# Copy config files and handler
 COPY configs/ /facefusion/configs/
 COPY handler.py /facefusion/handler.py
 
-# 入口
+# Entrypoint
 WORKDIR /facefusion
 CMD ["python", "handler.py"]

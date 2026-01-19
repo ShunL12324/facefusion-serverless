@@ -1,42 +1,58 @@
 # FaceFusion RunPod Serverless
 
-将 FaceFusion 视频换脸部署为 RunPod Serverless GPU 函数。
+Deploy FaceFusion face-swap as a RunPod Serverless GPU function.
 
-## 部署步骤
+## Features
 
-### 1. 构建 Docker 镜像
+- Face swap for videos and images
+- Pre-loaded models for fast cold start
+- Configurable quality presets (fast, quality, serverless)
+- NSFW check disabled for unrestricted processing
+- CUDA 12.8 + cuDNN on Ubuntu 24.04
+
+## Deployment
+
+### Option 1: GitHub Actions (Recommended)
+
+1. Fork this repository
+2. Add Docker Hub credentials as GitHub secrets:
+   - `DOCKERHUB_TOKEN`: Your Docker Hub access token
+3. Update `DOCKERHUB_USERNAME` in `.github/workflows/build.yml`
+4. Push to `main` branch to trigger automatic build
+
+### Option 2: Manual Build
 
 ```bash
-cd facefusion-serverless
+# Build image
+docker build -t your-username/facefusion-serverless:latest .
 
-# 构建镜像
-docker build -t your-dockerhub-username/facefusion-serverless:latest .
-
-# 推送到 Docker Hub
-docker push your-dockerhub-username/facefusion-serverless:latest
+# Push to Docker Hub
+docker login
+docker push your-username/facefusion-serverless:latest
 ```
 
-### 2. 创建 RunPod Serverless Endpoint
+### Create RunPod Endpoint
 
-1. 登录 [RunPod Console](https://www.runpod.io/console/serverless)
-2. 点击 "New Endpoint"
-3. 配置:
-   - **Container Image**: `your-dockerhub-username/facefusion-serverless:latest`
-   - **GPU Type**: RTX 4090 / A100 (推荐)
+1. Go to [RunPod Serverless Console](https://www.runpod.io/console/serverless)
+2. Click "New Endpoint"
+3. Configure:
+   - **Container Image**: `your-username/facefusion-serverless:latest`
+   - **GPU Type**: RTX 4090 / A100 (recommended)
    - **Container Disk**: 20GB
-   - **Max Workers**: 根据需求设置
-   - **Idle Timeout**: 5-10 秒
+   - **Max Workers**: Set based on your needs
+   - **Idle Timeout**: 5-10 seconds
 
-### 3. 调用 API
+## API Usage
+
+### Python Client
 
 ```python
 import runpod
-import time
 
 runpod.api_key = "your-runpod-api-key"
 endpoint = runpod.Endpoint("your-endpoint-id")
 
-# 发起换脸请求
+# Face swap request
 result = endpoint.run_sync({
     "input": {
         "source_url": "https://example.com/source_face.jpg",
@@ -51,36 +67,51 @@ result = endpoint.run_sync({
 print(result)
 ```
 
-## API 参数
+### cURL
 
-### 输入参数
+```bash
+curl -X POST "https://api.runpod.ai/v2/your-endpoint-id/runsync" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": {
+      "source_url": "https://example.com/source.jpg",
+      "target_url": "https://example.com/target.mp4"
+    }
+  }'
+```
 
-| 参数 | 必需 | 默认值 | 说明 |
-|------|------|--------|------|
-| `source_url` | ✅ | - | 源脸图片 URL |
-| `target_url` | ✅ | - | 目标视频/图片 URL |
-| `face_swapper_model` | ❌ | `inswapper_128_fp16` | 换脸模型 |
-| `face_enhancer_model` | ❌ | `gpen_bfr_512` | 增强模型 |
-| `face_enhancer_blend` | ❌ | `80` | 增强混合度 (0-100) |
-| `pixel_boost` | ❌ | `256x256` | 像素提升 |
-| `output_video_quality` | ❌ | `80` | 输出质量 (0-100) |
+## API Parameters
 
-### 可用模型
+### Input
+
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `source_url` | ✅ | - | Source face image URL |
+| `target_url` | ✅ | - | Target video/image URL |
+| `preset` | ❌ | `serverless` | Quality preset: `fast`, `quality`, `serverless` |
+| `face_swapper_model` | ❌ | `inswapper_128_fp16` | Face swap model |
+| `face_enhancer_model` | ❌ | `gpen_bfr_512` | Face enhancement model |
+| `face_enhancer_blend` | ❌ | `80` | Enhancement blend (0-100) |
+| `pixel_boost` | ❌ | `256x256` | Pixel boost resolution |
+| `output_video_quality` | ❌ | `80` | Output quality (0-100) |
+
+### Available Models
 
 **Face Swapper:**
-- `inswapper_128_fp16` (推荐，最快)
+- `inswapper_128_fp16` (recommended, fastest)
 - `inswapper_128`
 - `hyperswap_1a_256`
 - `blendswap_256`
-- `ghost_3_256` (最高质量)
+- `ghost_3_256` (highest quality)
 
 **Face Enhancer:**
-- `gpen_bfr_512` (推荐)
+- `gpen_bfr_512` (recommended)
 - `gpen_bfr_1024`
 - `gfpgan_1.4`
 - `codeformer`
 
-### 返回结果
+### Response
 
 ```json
 {
@@ -94,46 +125,52 @@ print(result)
 }
 ```
 
-## 云存储配置 (大文件)
+## Cloud Storage (Large Files)
 
-对于大于 10MB 的输出文件，需要配置云存储上传。
+For output files larger than 10MB, configure cloud storage upload.
 
-### 使用 AWS S3 / Cloudflare R2
+### AWS S3 / Cloudflare R2
 
-在 RunPod Endpoint 环境变量中设置:
+Set environment variables in RunPod Endpoint:
 
 ```
 AWS_ACCESS_KEY_ID=xxx
 AWS_SECRET_ACCESS_KEY=xxx
 S3_BUCKET=your-bucket-name
-S3_ENDPOINT=https://xxx.r2.cloudflarestorage.com  # R2 使用
+S3_ENDPOINT=https://xxx.r2.cloudflarestorage.com  # For R2
 ```
 
-然后修改 `handler.py` 中的 `upload_to_storage` 函数。
+Then modify the `upload_to_storage` function in `handler.py`.
 
-## 预下载模型 (减少冷启动)
+## Pre-loaded Models
 
-在 Dockerfile 中取消注释以下行:
+The following models are pre-downloaded during build to reduce cold start time:
 
-```dockerfile
-RUN python facefusion.py force-download --download-scope lite
-```
+- **Face Detection**: yoloface_8n
+- **Face Landmarker**: 2dfan4, fan_68_5
+- **Face Recognizer**: arcface_w600k_r50
+- **Face Classifier**: fairface
+- **Face Parser**: bisenet_resnet_34
+- **Face Swapper**: inswapper_128_fp16
+- **Face Enhancer**: gpen_bfr_512
 
-这会预下载基本模型，减少首次调用延迟。
+## Cost Estimation
 
-## 成本估算
+- **RTX 4090**: ~$0.44/hour
+- **A100 40GB**: ~$0.79/hour
 
-- **RTX 4090**: ~$0.44/小时
-- **A100 40GB**: ~$0.79/小时
+Processing a 1-minute video (1080p) takes approximately 2-5 minutes of GPU time.
 
-处理 1 分钟视频 (1080p) 大约需要 2-5 分钟 GPU 时间。
-
-## 本地测试
+## Local Testing
 
 ```bash
-# 构建测试镜像
+# Build test image
 docker build -t facefusion-test .
 
-# 运行测试
+# Run with GPU
 docker run --gpus all -p 8000:8000 facefusion-test
 ```
+
+## License
+
+This project wraps [FaceFusion](https://github.com/facefusion/facefusion) for serverless deployment.
