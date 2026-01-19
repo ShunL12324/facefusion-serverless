@@ -161,7 +161,13 @@ def run_facefusion(job_dir: str, source_path: str, target_path: str, output_path
         print(f"STDERR: {result.stderr}")
 
     if result.returncode != 0:
-        raise RuntimeError(f"FaceFusion failed with code {result.returncode}: {result.stderr}")
+        # 包含更详细的错误信息
+        error_details = f"Code: {result.returncode}\n"
+        if result.stdout:
+            error_details += f"STDOUT: {result.stdout[-2000:]}\n"  # 最后2000字符
+        if result.stderr:
+            error_details += f"STDERR: {result.stderr[-2000:]}"
+        raise RuntimeError(f"FaceFusion failed:\n{error_details}")
 
     return os.path.exists(output_path)
 

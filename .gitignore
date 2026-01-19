@@ -25,3 +25,4 @@ output.mp4
 # 临时文件
 *.tmp
 *.log
+run_faceswap.py
