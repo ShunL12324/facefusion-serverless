@@ -28,7 +28,6 @@ RUN git clone https://github.com/facefusion/facefusion.git
 WORKDIR /facefusion
 
 # Install Python dependencies (--break-system-packages for PEP 668)
-RUN pip install --upgrade pip --break-system-packages
 RUN pip install -r requirements.txt --break-system-packages
 RUN pip install onnxruntime-gpu --break-system-packages
 
