@@ -201,9 +201,10 @@ def generate_presigned_url(object_key: str, expires_in: int = 3600) -> str:
     amz_date = t.strftime('%Y%m%dT%H%M%SZ')
     date_stamp = t.strftime('%Y%m%d')
 
-    # URL encode the object key
-    encoded_key = quote(object_key, safe='')
-    canonical_uri = f'/{R2_BUCKET}/{encoded_key}'
+    # URL encode the object key (keep slashes for canonical URI)
+    encoded_key_for_uri = quote(object_key, safe='/')
+    encoded_key_for_url = quote(object_key, safe='')
+    canonical_uri = f'/{R2_BUCKET}/{encoded_key_for_uri}'
 
     credential_scope = f'{date_stamp}/{region}/{service}/aws4_request'
     credential = f'{R2_ACCESS_KEY_ID}/{credential_scope}'
@@ -236,8 +237,8 @@ def generate_presigned_url(object_key: str, expires_in: int = 3600) -> str:
     signing_key = _get_signature_key(R2_SECRET_ACCESS_KEY, date_stamp, region, service)
     signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
 
-    # 完整 URL
-    presigned_url = f'{R2_ENDPOINT}/{R2_BUCKET}/{encoded_key}?{canonical_querystring}&X-Amz-Signature={signature}'
+    # 完整 URL (use encoded key for URL path)
+    presigned_url = f'{R2_ENDPOINT}/{R2_BUCKET}/{encoded_key_for_url}?{canonical_querystring}&X-Amz-Signature={signature}'
     return presigned_url
 
 
