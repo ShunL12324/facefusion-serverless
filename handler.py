@@ -117,6 +117,10 @@ def get_file_extension(url: str) -> str:
 def run_facefusion(job_dir: str, source_path: str, target_path: str, output_path: str, params: dict) -> bool:
     """运行 FaceFusion headless 命令"""
 
+    # 确保临时目录存在
+    os.makedirs("/tmp", exist_ok=True)
+    os.makedirs("/var/tmp", exist_ok=True)
+
     # 打印调试信息
     print(f"Python: {sys.executable}")
     print(f"CWD: {os.getcwd()}")

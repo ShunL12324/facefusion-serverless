@@ -60,8 +60,14 @@ RUN python /tmp/disable-nsfw-check.py /facefusion
 COPY download_models.py /tmp/download_models.py
 RUN python /tmp/download_models.py standard
 
-# Create temp directory
-RUN mkdir -p /tmp/facefusion_jobs
+# Create temp directories with proper permissions
+RUN mkdir -p /tmp /var/tmp /tmp/facefusion_jobs && \
+    chmod 1777 /tmp /var/tmp
+
+# Set temp directory environment variable
+ENV TMPDIR=/tmp
+ENV TEMP=/tmp
+ENV TMP=/tmp
 
 # Set CUDA library path
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/dist-packages/nvidia/cublas/lib:/usr/local/lib/python3.12/dist-packages/nvidia/cudnn/lib:/usr/local/lib/python3.12/dist-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
