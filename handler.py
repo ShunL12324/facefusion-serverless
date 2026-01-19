@@ -31,12 +31,22 @@ import subprocess
 import time
 import tempfile
 import shutil
+import hashlib
+import hmac
 from pathlib import Path
-from urllib.parse import urlparse
+from datetime import datetime, timezone
+from urllib.parse import urlparse, quote
 import requests
 
 # RunPod handler
 import runpod
+
+# R2 配置 (从环境变量读取)
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_BUCKET = os.environ.get("R2_BUCKET", "default")
+R2_ENDPOINT = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else ""
 
 # 配置
 FACEFUSION_PATH = "/facefusion"
@@ -78,32 +88,187 @@ def download_file(url: str, dest_path: str) -> str:
     return dest_path
 
 
-def upload_to_storage(file_path: str) -> str:
+def _sign(key, msg):
+    """HMAC-SHA256 签名"""
+    return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
+
+
+def _get_signature_key(key, date_stamp, region, service):
+    """生成 AWS S3 签名密钥"""
+    k_date = _sign(('AWS4' + key).encode('utf-8'), date_stamp)
+    k_region = _sign(k_date, region)
+    k_service = _sign(k_region, service)
+    k_signing = _sign(k_service, 'aws4_request')
+    return k_signing
+
+
+def upload_to_r2(file_path: str, object_key: str) -> str:
+    """上传文件到 R2 并返回预签名 URL"""
+    if not R2_ACCOUNT_ID or not R2_ACCESS_KEY_ID or not R2_SECRET_ACCESS_KEY:
+        raise ValueError("R2 credentials not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY environment variables.")
+
+    print(f"Uploading to R2: {object_key}")
+    file_size = os.path.getsize(file_path)
+    print(f"  File size: {file_size / (1024 * 1024):.1f} MB")
+
+    # 准备请求
+    method = 'PUT'
+    service = 's3'
+    region = 'auto'
+    host = f"{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+    endpoint = f"{R2_ENDPOINT}/{R2_BUCKET}/{object_key}"
+
+    # 时间戳
+    t = datetime.now(timezone.utc)
+    amz_date = t.strftime('%Y%m%dT%H%M%SZ')
+    date_stamp = t.strftime('%Y%m%d')
+
+    # 确定 Content-Type
+    ext = os.path.splitext(file_path)[1].lower()
+    content_types = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.png': 'image/png', '.webp': 'image/webp',
+        '.mp4': 'video/mp4', '.mov': 'video/quicktime',
+        '.avi': 'video/x-msvideo', '.mkv': 'video/x-matroska',
+    }
+    content_type = content_types.get(ext, 'application/octet-stream')
+
+    # 使用 UNSIGNED-PAYLOAD 避免计算大文件哈希
+    payload_hash = 'UNSIGNED-PAYLOAD'
+
+    # 规范请求
+    canonical_uri = f'/{R2_BUCKET}/{object_key}'
+    canonical_querystring = ''
+    canonical_headers = (
+        f'content-type:{content_type}\n'
+        f'host:{host}\n'
+        f'x-amz-content-sha256:{payload_hash}\n'
+        f'x-amz-date:{amz_date}\n'
+    )
+    signed_headers = 'content-type;host;x-amz-content-sha256;x-amz-date'
+    canonical_request = (
+        f'{method}\n{canonical_uri}\n{canonical_querystring}\n'
+        f'{canonical_headers}\n{signed_headers}\n{payload_hash}'
+    )
+
+    # 待签名字符串
+    algorithm = 'AWS4-HMAC-SHA256'
+    credential_scope = f'{date_stamp}/{region}/{service}/aws4_request'
+    string_to_sign = (
+        f'{algorithm}\n{amz_date}\n{credential_scope}\n'
+        f'{hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()}'
+    )
+
+    # 计算签名
+    signing_key = _get_signature_key(R2_SECRET_ACCESS_KEY, date_stamp, region, service)
+    signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+    # 授权头
+    authorization_header = (
+        f'{algorithm} Credential={R2_ACCESS_KEY_ID}/{credential_scope}, '
+        f'SignedHeaders={signed_headers}, Signature={signature}'
+    )
+
+    # 发送请求（流式上传）
+    headers = {
+        'Content-Type': content_type,
+        'Host': host,
+        'x-amz-content-sha256': payload_hash,
+        'x-amz-date': amz_date,
+        'Authorization': authorization_header,
+        'Content-Length': str(file_size),
+    }
+
+    with open(file_path, 'rb') as f:
+        response = requests.put(endpoint, data=f, headers=headers, timeout=3600)
+
+    if response.status_code not in [200, 201]:
+        raise Exception(f"R2 upload failed: {response.status_code} - {response.text}")
+
+    print(f"  Upload successful!")
+    return object_key
+
+
+def generate_presigned_url(object_key: str, expires_in: int = 3600) -> str:
+    """生成 R2 预签名下载 URL"""
+    method = 'GET'
+    service = 's3'
+    region = 'auto'
+    host = f"{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+    # 时间戳
+    t = datetime.now(timezone.utc)
+    amz_date = t.strftime('%Y%m%dT%H%M%SZ')
+    date_stamp = t.strftime('%Y%m%d')
+
+    # URL encode the object key
+    encoded_key = quote(object_key, safe='')
+    canonical_uri = f'/{R2_BUCKET}/{encoded_key}'
+
+    credential_scope = f'{date_stamp}/{region}/{service}/aws4_request'
+    credential = f'{R2_ACCESS_KEY_ID}/{credential_scope}'
+
+    canonical_querystring = (
+        f'X-Amz-Algorithm=AWS4-HMAC-SHA256'
+        f'&X-Amz-Credential={quote(credential, safe="")}'
+        f'&X-Amz-Date={amz_date}'
+        f'&X-Amz-Expires={expires_in}'
+        f'&X-Amz-SignedHeaders=host'
+    )
+
+    canonical_headers = f'host:{host}\n'
+    signed_headers = 'host'
+    payload_hash = 'UNSIGNED-PAYLOAD'
+
+    canonical_request = (
+        f'{method}\n{canonical_uri}\n{canonical_querystring}\n'
+        f'{canonical_headers}\n{signed_headers}\n{payload_hash}'
+    )
+
+    # 待签名字符串
+    algorithm = 'AWS4-HMAC-SHA256'
+    string_to_sign = (
+        f'{algorithm}\n{amz_date}\n{credential_scope}\n'
+        f'{hashlib.sha256(canonical_request.encode("utf-8")).hexdigest()}'
+    )
+
+    # 计算签名
+    signing_key = _get_signature_key(R2_SECRET_ACCESS_KEY, date_stamp, region, service)
+    signature = hmac.new(signing_key, string_to_sign.encode('utf-8'), hashlib.sha256).hexdigest()
+
+    # 完整 URL
+    presigned_url = f'{R2_ENDPOINT}/{R2_BUCKET}/{encoded_key}?{canonical_querystring}&X-Amz-Signature={signature}'
+    return presigned_url
+
+
+def upload_to_storage(file_path: str, job_id: str) -> str:
     """
     上传结果文件到云存储
-    这里需要根据你的存储方案实现
-    可选方案: AWS S3, Cloudflare R2, RunPod 内置存储等
+    小文件返回 base64，大文件上传到 R2 并返回预签名 URL
     """
-    # 方案1: 使用 RunPod 的内置文件存储 (如果启用)
-    # 返回文件的 base64 编码 (适合小文件)
-
-    # 方案2: 上传到 S3/R2 (推荐大文件)
-    # 需要配置环境变量: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET
-
-    # 暂时返回本地路径，实际使用时需要实现上传逻辑
     import base64
 
     file_size = os.path.getsize(file_path)
+    ext = os.path.splitext(file_path)[1].lower()
 
     # 小于 10MB 的文件返回 base64
     if file_size < 10 * 1024 * 1024:
+        print(f"File size {file_size} bytes, returning as base64")
         with open(file_path, 'rb') as f:
             encoded = base64.b64encode(f.read()).decode('utf-8')
-        return f"data:video/mp4;base64,{encoded}"
+        mime_type = 'video/mp4' if ext == '.mp4' else 'application/octet-stream'
+        return f"data:{mime_type};base64,{encoded}"
 
-    # 大文件需要上传到云存储
-    # TODO: 实现 S3/R2 上传
-    raise ValueError(f"File too large ({file_size} bytes). Please configure cloud storage upload.")
+    # 大文件上传到 R2
+    print(f"File size {file_size} bytes, uploading to R2")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    object_key = f"facefusion/output/{job_id}_{timestamp}{ext}"
+
+    upload_to_r2(file_path, object_key)
+
+    # 生成 24 小时有效的预签名 URL
+    presigned_url = generate_presigned_url(object_key, expires_in=86400)
+    return presigned_url
 
 
 def get_file_extension(url: str) -> str:
@@ -227,7 +392,7 @@ def handler(job: dict) -> dict:
             return {"error": "Face swap processing failed - output file not created"}
 
         # 上传结果
-        output_url = upload_to_storage(output_path)
+        output_url = upload_to_storage(output_path, job_id)
 
         processing_time = time.time() - start_time
 
