@@ -6,20 +6,25 @@ FROM nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies
+# Install system dependencies and Python 3.12
 RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3.10-venv \
-    python3-pip \
+    software-properties-common \
     git \
     curl \
     ffmpeg \
     libgl1-mesa-glx \
     libglib2.0-0 \
+    && add-apt-repository ppa:deadsnakes/ppa -y \
+    && apt-get update \
+    && apt-get install -y python3.12 python3.12-venv python3.12-dev python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Setup Python
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1
+# Setup Python 3.12 as default
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+
+# Install pip for Python 3.12
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
 
 # Clone FaceFusion
 WORKDIR /
@@ -59,7 +64,7 @@ RUN python /tmp/download_models.py standard
 RUN mkdir -p /tmp/facefusion_jobs
 
 # Set CUDA library path
-ENV LD_LIBRARY_PATH=/usr/local/lib/python3.10/dist-packages/nvidia/cublas/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cudnn/lib:/usr/local/lib/python3.10/dist-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/dist-packages/nvidia/cublas/lib:/usr/local/lib/python3.12/dist-packages/nvidia/cudnn/lib:/usr/local/lib/python3.12/dist-packages/nvidia/cuda_runtime/lib:$LD_LIBRARY_PATH
 
 # Copy config files and handler
 COPY configs/ /facefusion/configs/
