@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# 环境
+.env
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 测试输出
+output.mp4
+*.mp4
+*.jpg
+*.png
+
+# 临时文件
+*.tmp
+*.log
