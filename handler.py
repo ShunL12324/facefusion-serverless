@@ -117,7 +117,22 @@ def get_file_extension(url: str) -> str:
 def run_facefusion(job_dir: str, source_path: str, target_path: str, output_path: str, params: dict) -> bool:
     """运行 FaceFusion headless 命令"""
 
-    # 构建命令 - 使用简化参数，不使用配置文件
+    # 打印调试信息
+    print(f"Python: {sys.executable}")
+    print(f"CWD: {os.getcwd()}")
+    print(f"Source exists: {os.path.exists(source_path)}, size: {os.path.getsize(source_path) if os.path.exists(source_path) else 0}")
+    print(f"Target exists: {os.path.exists(target_path)}, size: {os.path.getsize(target_path) if os.path.exists(target_path) else 0}")
+
+    # 检查 facefusion.py 是否存在
+    facefusion_script = os.path.join(FACEFUSION_PATH, "facefusion.py")
+    print(f"FaceFusion script exists: {os.path.exists(facefusion_script)}")
+
+    # 先测试 FaceFusion 是否能正常导入
+    test_cmd = [sys.executable, "-c", "import facefusion; print('FaceFusion OK')"]
+    test_result = subprocess.run(test_cmd, cwd=FACEFUSION_PATH, capture_output=True, text=True)
+    print(f"Import test: {test_result.stdout} {test_result.stderr}")
+
+    # 构建命令 - 使用简化参数
     cmd = [
         sys.executable, "facefusion.py", "headless-run",
         "-s", source_path,
