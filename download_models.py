@@ -22,13 +22,21 @@ def hf_url(repo: str, filename: str) -> str:
 # ============================================================
 
 CORE_MODELS = {
-    # Face Detector (face_detector.py) - models-3.0.0
+    # Face Detector (face_detector.py) - 使用 many 模式需要所有模型
     "yoloface_8n.onnx": hf_url("models-3.0.0", "yoloface_8n.onnx"),
     "yoloface_8n.hash": hf_url("models-3.0.0", "yoloface_8n.hash"),
+    "retinaface_10g.onnx": hf_url("models-3.0.0", "retinaface_10g.onnx"),
+    "retinaface_10g.hash": hf_url("models-3.0.0", "retinaface_10g.hash"),
+    "scrfd_2.5g.onnx": hf_url("models-3.0.0", "scrfd_2.5g.onnx"),
+    "scrfd_2.5g.hash": hf_url("models-3.0.0", "scrfd_2.5g.hash"),
+    "yunet_2023_mar.onnx": hf_url("models-3.4.0", "yunet_2023_mar.onnx"),
+    "yunet_2023_mar.hash": hf_url("models-3.4.0", "yunet_2023_mar.hash"),
 
-    # Face Landmarker (face_landmarker.py) - models-3.0.0
+    # Face Landmarker (face_landmarker.py) - 使用 many 模式
     "2dfan4.onnx": hf_url("models-3.0.0", "2dfan4.onnx"),
     "2dfan4.hash": hf_url("models-3.0.0", "2dfan4.hash"),
+    "peppa_wutz.onnx": hf_url("models-3.0.0", "peppa_wutz.onnx"),
+    "peppa_wutz.hash": hf_url("models-3.0.0", "peppa_wutz.hash"),
     "fan_68_5.onnx": hf_url("models-3.0.0", "fan_68_5.onnx"),
     "fan_68_5.hash": hf_url("models-3.0.0", "fan_68_5.hash"),
 
