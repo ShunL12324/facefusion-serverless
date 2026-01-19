@@ -117,33 +117,20 @@ def get_file_extension(url: str) -> str:
 def run_facefusion(job_dir: str, source_path: str, target_path: str, output_path: str, params: dict) -> bool:
     """运行 FaceFusion headless 命令"""
 
-    # 构建命令
+    # 构建命令 - 使用简化参数，不使用配置文件
     cmd = [
         sys.executable, "facefusion.py", "headless-run",
         "-s", source_path,
         "-t", target_path,
         "-o", output_path,
-    ]
-
-    # 使用预制配置文件
-    preset = params.get("preset", "serverless")
-    if preset in PRESET_CONFIGS:
-        config_path = os.path.join(CONFIGS_PATH, PRESET_CONFIGS[preset])
-        if os.path.exists(config_path):
-            cmd.extend(["--config-path", config_path])
-
-    # 添加自定义参数（会覆盖配置文件）
-    cmd.extend([
         "--processors", "face_swapper", "face_enhancer",
         "--face-swapper-model", params.get("face_swapper_model", DEFAULT_PARAMS["face_swapper_model"]),
-        "--face-swapper-pixel-boost", params.get("pixel_boost", DEFAULT_PARAMS["pixel_boost"]),
         "--face-enhancer-model", params.get("face_enhancer_model", DEFAULT_PARAMS["face_enhancer_model"]),
         "--face-enhancer-blend", str(params.get("face_enhancer_blend", DEFAULT_PARAMS["face_enhancer_blend"])),
         "--output-video-quality", str(params.get("output_video_quality", DEFAULT_PARAMS["output_video_quality"])),
-        "--output-audio-encoder", params.get("output_audio_encoder", DEFAULT_PARAMS["output_audio_encoder"]),
-        "--execution-providers", params.get("execution_providers", DEFAULT_PARAMS["execution_providers"]),
-        "--log-level", "info",
-    ])
+        "--execution-providers", "cuda",
+        "--log-level", "debug",
+    ]
 
     print(f"Running command: {' '.join(cmd)}")
 
