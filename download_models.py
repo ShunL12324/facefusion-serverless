@@ -43,6 +43,10 @@ CORE_MODELS = {
     # Face Parser/Masker (face_masker.py) - models-3.0.0
     "bisenet_resnet_34.onnx": hf_url("models-3.0.0", "bisenet_resnet_34.onnx"),
     "bisenet_resnet_34.hash": hf_url("models-3.0.0", "bisenet_resnet_34.hash"),
+
+    # Face Occluder (遮挡检测) - models-3.2.0
+    "xseg_3.onnx": hf_url("models-3.2.0", "xseg_3.onnx"),
+    "xseg_3.hash": hf_url("models-3.2.0", "xseg_3.hash"),
 }
 
 
