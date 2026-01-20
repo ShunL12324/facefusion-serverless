@@ -110,10 +110,30 @@ def download_with_ytdlp(url: str, dest_path: str) -> str:
 
     print(f"Downloading with yt-dlp: {url}")
 
-    # 尝试更新 yt-dlp（静默失败）
+    # 打印当前版本
     try:
-        subprocess.run(["pip", "install", "--upgrade", "--quiet", "yt-dlp"],
-                      capture_output=True, timeout=60)
+        ver = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=10)
+        print(f"yt-dlp version before update: {ver.stdout.strip()}")
+    except:
+        pass
+
+    # 尝试更新 yt-dlp
+    print("Updating yt-dlp...")
+    try:
+        update = subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"],
+                               capture_output=True, text=True, timeout=120)
+        print(f"Update result: {update.returncode}")
+        if update.stdout:
+            print(f"Update stdout: {update.stdout[-500:]}")
+        if update.stderr:
+            print(f"Update stderr: {update.stderr[-500:]}")
+    except Exception as e:
+        print(f"Update failed: {e}")
+
+    # 打印更新后版本
+    try:
+        ver = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=10)
+        print(f"yt-dlp version after update: {ver.stdout.strip()}")
     except:
         pass
 
