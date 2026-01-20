@@ -73,9 +73,92 @@ DEFAULT_PARAMS = {
     "preset": "serverless",  # 默认使用 serverless 配置
 }
 
+# yt-dlp 支持的网站域名模式
+YTDLP_SUPPORTED_DOMAINS = [
+    # 主流视频平台
+    "youtube.com", "youtu.be", "vimeo.com", "dailymotion.com",
+    "tiktok.com", "twitter.com", "x.com", "instagram.com", "facebook.com",
+    "twitch.tv", "bilibili.com", "douyin.com",
+    # 成人网站
+    "pornhub.com", "xvideos.com", "xnxx.com", "redtube.com",
+    "youporn.com", "xhamster.com", "spankbang.com", "eporner.com",
+    "tube8.com", "thumbzilla.com", "xtube.com",
+]
+
+
+def is_ytdlp_url(url: str) -> bool:
+    """检查 URL 是否需要 yt-dlp 下载"""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        domain = parsed.netloc.lower()
+        # 移除 www. 前缀
+        if domain.startswith("www."):
+            domain = domain[4:]
+        # 检查是否匹配支持的域名
+        for supported in YTDLP_SUPPORTED_DOMAINS:
+            if domain == supported or domain.endswith("." + supported):
+                return True
+        return False
+    except:
+        return False
+
+
+def download_with_ytdlp(url: str, dest_path: str) -> str:
+    """使用 yt-dlp 下载视频"""
+    import subprocess
+
+    print(f"Downloading with yt-dlp: {url}")
+
+    # 获取目标目录和文件名
+    dest_dir = os.path.dirname(dest_path)
+    dest_name = os.path.splitext(os.path.basename(dest_path))[0]
+
+    # yt-dlp 命令
+    cmd = [
+        "yt-dlp",
+        "-f", "best[ext=mp4]/best",  # 优先 mp4 格式
+        "--no-playlist",              # 不下载播放列表
+        "-o", os.path.join(dest_dir, f"{dest_name}.%(ext)s"),
+        "--no-warnings",
+        url
+    ]
+
+    print(f"Running: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+
+    if result.returncode != 0:
+        print(f"yt-dlp stderr: {result.stderr}")
+        raise RuntimeError(f"yt-dlp failed: {result.stderr}")
+
+    # 查找下载的文件
+    import glob
+    downloaded_files = glob.glob(os.path.join(dest_dir, f"{dest_name}.*"))
+    if not downloaded_files:
+        raise RuntimeError("yt-dlp did not produce any output file")
+
+    downloaded_file = downloaded_files[0]
+
+    # 如果下载的文件名与目标不同，重命名
+    if downloaded_file != dest_path:
+        actual_ext = os.path.splitext(downloaded_file)[1]
+        new_dest = os.path.splitext(dest_path)[0] + actual_ext
+        if downloaded_file != new_dest:
+            os.rename(downloaded_file, new_dest)
+            downloaded_file = new_dest
+
+    print(f"Downloaded to: {downloaded_file}")
+    return downloaded_file
+
 
 def download_file(url: str, dest_path: str) -> str:
-    """下载文件到指定路径"""
+    """下载文件到指定路径（自动检测是否使用 yt-dlp）"""
+
+    # 检查是否需要 yt-dlp
+    if is_ytdlp_url(url):
+        return download_with_ytdlp(url, dest_path)
+
+    # 普通 HTTP 下载
     print(f"Downloading: {url}")
     response = requests.get(url, stream=True, timeout=300)
     response.raise_for_status()
@@ -365,15 +448,16 @@ def handler(job: dict) -> dict:
         # 下载源文件
         source_ext = get_file_extension(source_url)
         source_path = os.path.join(job_dir, f"source{source_ext}")
-        download_file(source_url, source_path)
+        source_path = download_file(source_url, source_path)  # 使用实际下载路径
 
         # 下载目标文件
         target_ext = get_file_extension(target_url)
         target_path = os.path.join(job_dir, f"target{target_ext}")
-        download_file(target_url, target_path)
+        target_path = download_file(target_url, target_path)  # 使用实际下载路径
 
-        # 输出路径
-        output_path = os.path.join(job_dir, f"output{target_ext}")
+        # 输出路径 (使用目标文件的实际扩展名)
+        actual_target_ext = os.path.splitext(target_path)[1]
+        output_path = os.path.join(job_dir, f"output{actual_target_ext}")
 
         # 运行换脸
         params = {

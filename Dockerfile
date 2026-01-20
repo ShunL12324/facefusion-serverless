@@ -49,8 +49,8 @@ RUN pip install \
     nvidia-cuda-nvrtc-cu12 \
     nvidia-nvjitlink-cu12
 
-# Install RunPod SDK
-RUN pip install runpod requests
+# Install RunPod SDK and yt-dlp
+RUN pip install runpod requests yt-dlp
 
 # Apply NSFW patch (disable content check)
 COPY patches/disable-nsfw-check.py /tmp/disable-nsfw-check.py
