@@ -110,6 +110,13 @@ def download_with_ytdlp(url: str, dest_path: str) -> str:
 
     print(f"Downloading with yt-dlp: {url}")
 
+    # 尝试更新 yt-dlp（静默失败）
+    try:
+        subprocess.run(["pip", "install", "--upgrade", "--quiet", "yt-dlp"],
+                      capture_output=True, timeout=60)
+    except:
+        pass
+
     # 获取目标目录和文件名
     dest_dir = os.path.dirname(dest_path)
     dest_name = os.path.splitext(os.path.basename(dest_path))[0]
