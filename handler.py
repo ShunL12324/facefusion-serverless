@@ -51,7 +51,7 @@ R2_ENDPOINT = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_
 # 配置
 FACEFUSION_PATH = "/facefusion"
 MODELS_PATH = "/facefusion/.assets/models"
-TEMP_DIR = "/runpod-volume/facefusion_jobs"  # 使用 volume 存储，空间更大
+TEMP_DIR = "/tmp/facefusion_jobs"
 CONFIGS_PATH = "/facefusion/configs"
 
 # 预制配置
@@ -460,23 +460,10 @@ def handler(job: dict) -> dict:
     if not source_url or not target_url:
         return {"error": "Missing required parameters: source_url and target_url"}
 
-    # 创建工作目录（优先使用 volume，否则用 /tmp）
+    # 创建工作目录
     job_id = job.get("id", f"job_{int(time.time())}")
-    if os.path.exists("/runpod-volume"):
-        base_dir = "/runpod-volume/facefusion_jobs"
-    else:
-        base_dir = "/tmp/facefusion_jobs"
-    job_dir = os.path.join(base_dir, job_id)
+    job_dir = os.path.join(TEMP_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
-
-    # 打印磁盘空间信息
-    try:
-        import shutil
-        total, used, free = shutil.disk_usage(job_dir)
-        print(f"Working dir: {job_dir}")
-        print(f"Disk space: {free // (1024**3)}GB free / {total // (1024**3)}GB total")
-    except Exception as e:
-        print(f"Disk info error: {e}")
 
     try:
         # 下载源文件
