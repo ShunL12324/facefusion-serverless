@@ -391,7 +391,6 @@ def run_facefusion(job_dir: str, source_path: str, target_path: str, output_path
         "-s", source_path,
         "-t", target_path,
         "-o", output_path,
-        "--temp-dir", job_dir,  # 使用 job 目录作为临时目录，避免 /tmp 空间不足
         "--processors", "face_swapper", "face_enhancer", "expression_restorer",
         "--face-swapper-model", params.get("face_swapper_model", DEFAULT_PARAMS["face_swapper_model"]),
         "--face-swapper-pixel-boost", params.get("pixel_boost", DEFAULT_PARAMS["pixel_boost"]),
