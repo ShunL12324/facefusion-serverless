@@ -117,16 +117,15 @@ def download_with_ytdlp(url: str, dest_path: str) -> str:
     except:
         pass
 
-    # 尝试更新 yt-dlp
-    print("Updating yt-dlp...")
+    # 尝试更新 yt-dlp（从 GitHub 安装最新版）
+    print("Updating yt-dlp from GitHub...")
     try:
-        update = subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"],
+        update = subprocess.run([sys.executable, "-m", "pip", "install", "-U",
+                                "git+https://github.com/yt-dlp/yt-dlp.git"],
                                capture_output=True, text=True, timeout=120)
         print(f"Update result: {update.returncode}")
-        if update.stdout:
-            print(f"Update stdout: {update.stdout[-500:]}")
-        if update.stderr:
-            print(f"Update stderr: {update.stderr[-500:]}")
+        if update.returncode != 0 and update.stderr:
+            print(f"Update stderr: {update.stderr[-300:]}")
     except Exception as e:
         print(f"Update failed: {e}")
 
