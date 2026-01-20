@@ -55,6 +55,14 @@ CORE_MODELS = {
     # Face Occluder (遮挡检测) - models-3.2.0
     "xseg_3.onnx": hf_url("models-3.2.0", "xseg_3.onnx"),
     "xseg_3.hash": hf_url("models-3.2.0", "xseg_3.hash"),
+
+    # Expression Restorer (表情修复) - models-3.0.0
+    "live_portrait_feature_extractor.onnx": hf_url("models-3.0.0", "live_portrait_feature_extractor.onnx"),
+    "live_portrait_feature_extractor.hash": hf_url("models-3.0.0", "live_portrait_feature_extractor.hash"),
+    "live_portrait_generator.onnx": hf_url("models-3.0.0", "live_portrait_generator.onnx"),
+    "live_portrait_generator.hash": hf_url("models-3.0.0", "live_portrait_generator.hash"),
+    "live_portrait_motion_extractor.onnx": hf_url("models-3.0.0", "live_portrait_motion_extractor.onnx"),
+    "live_portrait_motion_extractor.hash": hf_url("models-3.0.0", "live_portrait_motion_extractor.hash"),
 }
 
 
@@ -98,14 +106,6 @@ OPTIONAL_MODELS = {
     # Face Occluder (遮挡检测) - models-3.1.0
     "xseg_1.onnx": hf_url("models-3.1.0", "xseg_1.onnx"),
     "xseg_1.hash": hf_url("models-3.1.0", "xseg_1.hash"),
-
-    # Expression Restorer (表情修复) - models-3.0.0
-    "live_portrait_feature_extractor.onnx": hf_url("models-3.0.0", "live_portrait_feature_extractor.onnx"),
-    "live_portrait_feature_extractor.hash": hf_url("models-3.0.0", "live_portrait_feature_extractor.hash"),
-    "live_portrait_generator.onnx": hf_url("models-3.0.0", "live_portrait_generator.onnx"),
-    "live_portrait_generator.hash": hf_url("models-3.0.0", "live_portrait_generator.hash"),
-    "live_portrait_motion_extractor.onnx": hf_url("models-3.0.0", "live_portrait_motion_extractor.onnx"),
-    "live_portrait_motion_extractor.hash": hf_url("models-3.0.0", "live_portrait_motion_extractor.hash"),
 }
 
 
