@@ -51,7 +51,7 @@ R2_ENDPOINT = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_
 # 配置
 FACEFUSION_PATH = "/facefusion"
 MODELS_PATH = "/facefusion/.assets/models"
-TEMP_DIR = "/tmp/facefusion_jobs"
+TEMP_DIR = "/runpod-volume/facefusion_jobs"  # 使用 volume 存储，空间更大
 CONFIGS_PATH = "/facefusion/configs"
 
 # 预制配置
@@ -398,6 +398,7 @@ def run_facefusion(job_dir: str, source_path: str, target_path: str, output_path
         "-s", source_path,
         "-t", target_path,
         "-o", output_path,
+        "--temp-dir", job_dir,  # 使用 job 目录作为临时目录，避免 /tmp 空间不足
         "--processors", "face_swapper", "face_enhancer", "expression_restorer",
         "--face-swapper-model", params.get("face_swapper_model", DEFAULT_PARAMS["face_swapper_model"]),
         "--face-swapper-pixel-boost", params.get("pixel_boost", DEFAULT_PARAMS["pixel_boost"]),
@@ -459,10 +460,23 @@ def handler(job: dict) -> dict:
     if not source_url or not target_url:
         return {"error": "Missing required parameters: source_url and target_url"}
 
-    # 创建工作目录
+    # 创建工作目录（优先使用 volume，否则用 /tmp）
     job_id = job.get("id", f"job_{int(time.time())}")
-    job_dir = os.path.join(TEMP_DIR, job_id)
+    if os.path.exists("/runpod-volume"):
+        base_dir = "/runpod-volume/facefusion_jobs"
+    else:
+        base_dir = "/tmp/facefusion_jobs"
+    job_dir = os.path.join(base_dir, job_id)
     os.makedirs(job_dir, exist_ok=True)
+
+    # 打印磁盘空间信息
+    try:
+        import shutil
+        total, used, free = shutil.disk_usage(job_dir)
+        print(f"Working dir: {job_dir}")
+        print(f"Disk space: {free // (1024**3)}GB free / {total // (1024**3)}GB total")
+    except Exception as e:
+        print(f"Disk info error: {e}")
 
     try:
         # 下载源文件
