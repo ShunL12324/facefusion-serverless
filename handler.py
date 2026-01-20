@@ -11,7 +11,7 @@ FaceFusion RunPod Serverless Handler
         "face_swapper_model": "inswapper_128_fp16",       # 可选，默认 inswapper_128_fp16
         "face_enhancer_model": "gpen_bfr_512",            # 可选，默认 gpen_bfr_512
         "face_enhancer_blend": 80,                        # 可选，默认 80
-        "pixel_boost": "256x256",                         # 可选，默认 256x256
+        "pixel_boost": "512x512",                         # 可选，默认 512x512 (可选 256x256, 1024x1024)
         "output_video_quality": 80,                       # 可选，默认 80
         "webhook_url": "https://xxx/callback"             # 可选，完成后回调
     }
@@ -66,7 +66,7 @@ DEFAULT_PARAMS = {
     "face_swapper_model": "inswapper_128_fp16",
     "face_enhancer_model": "gpen_bfr_512",
     "face_enhancer_blend": 80,
-    "pixel_boost": "256x256",
+    "pixel_boost": "512x512",
     "output_video_quality": 80,
     "output_audio_encoder": "aac",
     "execution_providers": "cuda",
@@ -358,6 +358,18 @@ def run_facefusion(job_dir: str, source_path: str, target_path: str, output_path
     os.makedirs("/tmp", exist_ok=True)
     os.makedirs("/var/tmp", exist_ok=True)
 
+    # 设置 CUDA 内存分配策略，避免碎片化
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    os.environ["ORT_CUDA_ARENA_EXTEND_STRATEGY"] = "kSameAsRequested"
+
+    # 打印 GPU 状态
+    try:
+        gpu_info = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total,memory.free,memory.used", "--format=csv"],
+                                   capture_output=True, text=True, timeout=10)
+        print(f"GPU Status:\n{gpu_info.stdout}")
+    except Exception as e:
+        print(f"nvidia-smi failed: {e}")
+
     # 打印调试信息
     print(f"Python: {sys.executable}")
     print(f"CWD: {os.getcwd()}")
@@ -381,6 +393,7 @@ def run_facefusion(job_dir: str, source_path: str, target_path: str, output_path
         "-o", output_path,
         "--processors", "face_swapper", "face_enhancer", "expression_restorer",
         "--face-swapper-model", params.get("face_swapper_model", DEFAULT_PARAMS["face_swapper_model"]),
+        "--face-swapper-pixel-boost", params.get("pixel_boost", DEFAULT_PARAMS["pixel_boost"]),
         "--face-swapper-weight", "0.85",
         "--face-enhancer-model", params.get("face_enhancer_model", DEFAULT_PARAMS["face_enhancer_model"]),
         "--face-enhancer-blend", str(params.get("face_enhancer_blend", DEFAULT_PARAMS["face_enhancer_blend"])),
